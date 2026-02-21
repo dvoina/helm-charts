@@ -76,14 +76,27 @@ jobs:
             chmod +x get_helm.sh
             ./get_helm.sh --version v3.12.0
             export PATH=/usr/local/bin:$PATH
+            if [ -x /usr/local/bin/helm ]; then
+              HELM_BIN=/usr/local/bin/helm
+            fi
           fi
           # Use explicit helm binary
-          HELM_BIN=$(which helm || echo /usr/local/bin/helm)
+          HELM_BIN=${HELM_BIN:-$(which helm || echo /usr/local/bin/helm)}
           echo "Using helm: $HELM_BIN"
           $HELM_BIN version --short || true
           $HELM_BIN help | head -n 40 || true
-          $HELM_BIN chart save ckan oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
-          $HELM_BIN chart push oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+          if $HELM_BIN help chart >/dev/null 2>&1; then
+            echo "Using 'helm chart' commands"
+            $HELM_BIN chart save ckan oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+            $HELM_BIN chart push oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+          else
+            echo "'helm chart' not available; falling back to 'helm push' of packaged chart"
+            CHART_TGZ=$(ls charts | grep ckan | head -n1)
+            echo "Pushing packaged chart: charts/$CHART_TGZ"
+            $HELM_BIN push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan || (
+              echo "helm push failed; printing help for push" && $HELM_BIN push --help || true
+            )
+          fi
 
       - name: Output published reference
         run: |
