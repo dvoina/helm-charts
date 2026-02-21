@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ckan.fullname" . }}-solr
+  labels:
+    {{- include "ckan.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "ckan.fullname" . }}-solr
+  template:
+    metadata:
+      labels:
+        app: {{ include "ckan.fullname" . }}-solr
+    spec:
+      initContainers:
+        - name: solr-init
+          image: {{ .Values.solr.image.repository }}:{{ .Values.solr.image.tag }}
+          imagePullPolicy: {{ .Values.solr.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              rm -rf /var/solr/data/ckan && mkdir -p /var/solr/data && chown -R 8983:8983 /var/solr
+          volumeMounts:
+            - name: solr-data
+              mountPath: /var/solr
+      containers:
+        - name: solr
+          image: {{ .Values.solr.image.repository }}:{{ .Values.solr.image.tag }}
+          imagePullPolicy: {{ .Values.solr.image.pullPolicy }}
+          ports:
+            - containerPort: 8983
+              name: solr
+          args:
+            - ckan
+            - /opt/solr/server/solr/configsets/ckan
+          volumeMounts:
+            - name: solr-data
+              mountPath: /var/solr
+      volumes:
+        - name: solr-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ckan.fullname" . }}-solr
+  labels:
+    {{- include "ckan.labels" . | nindent 4 }}
+spec:
+  selector:
+    app: {{ include "ckan.fullname" . }}-solr
+  ports:
+    - name: solr
+      port: 8983
+      targetPort: 8983

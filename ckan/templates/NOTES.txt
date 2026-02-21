@@ -1,0 +1,16 @@
+CKAN has been deployed.
+
+Next steps:
+1) Initialize the database:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "ckan.fullname" . }} -- \
+     ckan -c /config/ckan.ini db init
+
+2) Create an admin user and promote to sysadmin:
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "ckan.fullname" . }} -- \
+     ckan -c /config/ckan.ini user add admin email=admin@example.com password=changeme
+
+   kubectl exec -n {{ .Release.Namespace }} deploy/{{ include "ckan.fullname" . }} -- \
+     ckan -c /config/ckan.ini sysadmin add admin
+
+Ingress:
+  {{ .Values.ingress.host }}{{ .Values.ingress.paths.ckan }}

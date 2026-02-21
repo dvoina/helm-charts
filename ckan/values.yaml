@@ -1,0 +1,52 @@
+image:
+  repository: ckan/ckan-base
+  tag: "2.10"
+  pullPolicy: IfNotPresent
+
+postgres:
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  user: ckan
+  password: ckan
+  db: ckan
+  datastoreDb: ckan_datastore
+  roUser: ckan_ro
+  roPassword: ckan_ro
+
+redis:
+  image:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+
+solr:
+  image:
+    repository: ckan/ckan-solr
+    tag: "2.10"
+    pullPolicy: IfNotPresent
+
+ckan:
+  siteUrl: "http://stids.concept4gl.xyz/ckan"
+  rootPath: "/ckan"
+  storagePath: "/var/lib/ckan"
+
+secrets:
+  create: true
+  secretKey: ckan-secret-key-change-me
+  beakerSessionSecret: ckan-beaker-secret-change-me
+
+ingress:
+  enabled: true
+  className: traefik
+  host: stids.concept4gl.xyz
+  tls:
+    enabled: true
+    secretName: stids.concept4gl.xyz-tls
+  paths:
+    ckan: /ckan
+    base: /base
+  stripPrefix: true
+
+resources: {}

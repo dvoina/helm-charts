@@ -1,0 +1,12 @@
+{{- if and .Values.ingress.enabled .Values.ingress.stripPrefix -}}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "ckan.fullname" . }}-strip
+  labels:
+    {{- include "ckan.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - {{ .Values.ingress.paths.ckan | quote }}
+{{- end -}}

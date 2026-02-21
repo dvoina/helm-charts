@@ -1,0 +1,41 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "ckan.fullname" . }}
+  labels:
+    {{- include "ckan.labels" . | nindent 4 }}
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+    {{- if .Values.ingress.stripPrefix }}
+    traefik.ingress.kubernetes.io/router.middlewares: {{ printf "%s-%s-strip@kubernetescrd" .Release.Namespace (include "ckan.fullname" .) }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: {{ .Values.ingress.paths.ckan }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ckan.fullname" . }}
+                port:
+                  number: 5000
+          - path: {{ .Values.ingress.paths.base }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ckan.fullname" . }}
+                port:
+                  number: 5000
+{{- end -}}

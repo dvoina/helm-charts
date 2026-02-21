@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ckan.fullname" . }}
+  labels:
+    {{- include "ckan.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "ckan.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "ckan.fullname" . }}
+    spec:
+      initContainers:
+        - name: ckan-config-init
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              cp /srv/app/ckan.ini /config/ckan.ini
+              if grep -q '^SECRET_KEY' /config/ckan.ini; then
+                sed -i "s/^SECRET_KEY.*/SECRET_KEY = $${SECRET_KEY}/" /config/ckan.ini
+              else
+                echo "SECRET_KEY = $${SECRET_KEY}" >> /config/ckan.ini
+              fi
+              if grep -q '^beaker.session.secret' /config/ckan.ini; then
+                sed -i "s/^beaker.session.secret.*/beaker.session.secret = $${BEAKER_SESSION_SECRET}/" /config/ckan.ini
+              else
+                echo "beaker.session.secret = $${BEAKER_SESSION_SECRET}" >> /config/ckan.ini
+              fi
+              if grep -q '^ckan.site_url' /config/ckan.ini; then
+                sed -i "s|^ckan.site_url.*|ckan.site_url = $${CKAN_SITE_URL}|" /config/ckan.ini
+              else
+                echo "ckan.site_url = $${CKAN_SITE_URL}" >> /config/ckan.ini
+              fi
+              if grep -q '^ckan.root_path' /config/ckan.ini; then
+                sed -i "s|^ckan.root_path.*|ckan.root_path = $${CKAN_ROOT_PATH}|" /config/ckan.ini
+              else
+                echo "ckan.root_path = $${CKAN_ROOT_PATH}" >> /config/ckan.ini
+              fi
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: secret_key
+            - name: BEAKER_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: beaker_session_secret
+            - name: CKAN_SITE_URL
+              value: {{ .Values.ckan.siteUrl | quote }}
+            - name: CKAN_ROOT_PATH
+              value: {{ .Values.ckan.rootPath | quote }}
+          volumeMounts:
+            - name: ckan-config
+              mountPath: /config
+      containers:
+        - name: ckan
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - ckan
+            - -c
+            - /config/ckan.ini
+            - run
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "5000"
+          ports:
+            - containerPort: 5000
+              name: http
+          env:
+            - name: CKAN__SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: secret_key
+            - name: CKAN_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: secret_key
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: secret_key
+            - name: BEAKER__SESSION__SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: beaker_session_secret
+            - name: CKAN_BEAKER_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: beaker_session_secret
+            - name: BEAKER_SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ckan.fullname" . }}-secrets
+                  key: beaker_session_secret
+            - name: CKAN_SITE_URL
+              value: {{ .Values.ckan.siteUrl | quote }}
+            - name: CKAN__SITE_URL
+              value: {{ .Values.ckan.siteUrl | quote }}
+            - name: CKAN__ROOT_PATH
+              value: {{ .Values.ckan.rootPath | quote }}
+            - name: CKAN_SQLALCHEMY_URL
+              value: {{ printf "postgresql://%s:%s@%s-postgres:5432/%s" .Values.postgres.user .Values.postgres.password (include "ckan.fullname" .) .Values.postgres.db | quote }}
+            - name: CKAN_DATASTORE_WRITE_URL
+              value: {{ printf "postgresql://%s:%s@%s-postgres:5432/%s" .Values.postgres.user .Values.postgres.password (include "ckan.fullname" .) .Values.postgres.datastoreDb | quote }}
+            - name: CKAN_DATASTORE_READ_URL
+              value: {{ printf "postgresql://%s:%s@%s-postgres:5432/%s" .Values.postgres.roUser .Values.postgres.roPassword (include "ckan.fullname" .) .Values.postgres.datastoreDb | quote }}
+            - name: CKAN_SOLR_URL
+              value: {{ printf "http://%s-solr:8983/solr/ckan" (include "ckan.fullname" .) | quote }}
+            - name: CKAN_REDIS_URL
+              value: {{ printf "redis://%s-redis:6379/0" (include "ckan.fullname" .) | quote }}
+            - name: CKAN_STORAGE_PATH
+              value: {{ .Values.ckan.storagePath | quote }}
+          volumeMounts:
+            - name: ckan-storage
+              mountPath: /var/lib/ckan
+            - name: ckan-config
+              mountPath: /config
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: ckan-storage
+          emptyDir: {}
+        - name: ckan-config
+          emptyDir: {}
