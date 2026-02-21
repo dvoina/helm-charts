@@ -69,20 +69,16 @@ jobs:
           VERSION=${{ steps.chart_version.outputs.version }}
           CHART_NAME=$(ls charts | grep ckan | head -n1 | sed 's/\.tgz$//')
           export HELM_EXPERIMENTAL_OCI=1
-          # Resolve a helm binary that supports the 'chart' subcommand
-          HELM_BIN=$(which helm || true)
-          if [ -n "$HELM_BIN" ]; then
-            if ! $HELM_BIN help chart >/dev/null 2>&1; then
-              if [ -x /usr/local/bin/helm ]; then
-                HELM_BIN=/usr/local/bin/helm
-              elif [ -x /home/runner/.local/bin/helm ]; then
-                HELM_BIN=/home/runner/.local/bin/helm
-              fi
-            fi
-          else
-            # fallback
-            HELM_BIN=/usr/local/bin/helm
+          # If current helm doesn't support 'chart', install Helm and prefer /usr/local/bin
+          if ! helm help chart >/dev/null 2>&1; then
+            echo "Current helm lacks 'chart' — installing Helm v3.12.0 and prepending /usr/local/bin to PATH"
+            curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+            chmod +x get_helm.sh
+            ./get_helm.sh --version v3.12.0
+            export PATH=/usr/local/bin:$PATH
           fi
+          # Use explicit helm binary
+          HELM_BIN=$(which helm || echo /usr/local/bin/helm)
           echo "Using helm: $HELM_BIN"
           $HELM_BIN version --short || true
           $HELM_BIN help | head -n 40 || true
