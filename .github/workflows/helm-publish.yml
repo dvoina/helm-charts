@@ -42,18 +42,19 @@ jobs:
             # Update chart dependencies
             helm dependency update "$chart_dir" || true
             
-            # Package chart
-            helm package "$chart_dir" --destination charts
+            # Package chart and capture output
+            PACKAGE_OUTPUT=$(helm package "$chart_dir" --destination charts 2>&1)
             
             # Extract chart name and version (trim whitespace)
             CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
             VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
             
-            # Find packaged chart file
-            CHART_TGZ=$(ls -1 charts/${CHART_NAME}-${VERSION}.tgz 2>/dev/null || echo "")
+            # Extract packaged file from helm output
+            CHART_TGZ=$(echo "$PACKAGE_OUTPUT" | grep -oP 'saved it to: \K.*' | xargs)
             
-            if [ -z "$CHART_TGZ" ]; then
+            if [ -z "$CHART_TGZ" ] || [ ! -f "$CHART_TGZ" ]; then
               echo "Error: Could not find packaged chart for $CHART_NAME"
+              echo "Package output: $PACKAGE_OUTPUT"
               exit 1
             fi
             
