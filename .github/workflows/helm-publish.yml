@@ -34,7 +34,7 @@ jobs:
           mkdir -p charts
           
           # Find all directories containing Chart.yaml (charts are at top level)
-          for chart_dir in $(find . -maxdepth 1 -name 'Chart.yaml' -type f | xargs -I {} dirname {} | sed 's|^\./||' | sort); do
+          for chart_dir in $(find . -maxdepth 2 -name 'Chart.yaml' -type f | xargs -I {} dirname {} | sed 's|^\./||' | sort); do
             [ "$chart_dir" = "." ] && continue
             
             echo "Processing chart: $chart_dir"
