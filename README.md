@@ -6,8 +6,8 @@ Some general purpose helm charts
 This repository includes a GitHub Actions workflow that packages the `ckan` chart and publishes it to GitHub Container Registry (GHCR) as an OCI artifact: [.github/workflows/helm-publish.yml](.github/workflows/helm-publish.yml)
 
 Prerequisites
-- Helm 3.12.0+ installed locally for manual testing (matches CI).
-- If you have an older Helm, either upgrade (recommended) or set `HELM_EXPERIMENTAL_OCI=1` when using older Helm builds.
+- Helm 4.0.0+ installed locally for manual testing (matches CI).
+- If you are using Helm 3.x locally for ad-hoc testing, package and push the chart with `helm push charts/<tgz> oci://...` as shown below.
 - The workflow uses the repository `GITHUB_TOKEN` (no extra secret required) and requires the `packages: write` permission for Actions. The workflow file already sets this permission.
 
 Quick local test (optional)

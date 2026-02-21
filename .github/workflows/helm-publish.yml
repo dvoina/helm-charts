@@ -56,7 +56,7 @@ jobs:
           export HELM_EXPERIMENTAL_OCI=1
           echo "Logging into GHCR"
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+          helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan
 
       - name: Output published reference
         run: |
