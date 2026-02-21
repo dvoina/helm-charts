@@ -25,24 +25,8 @@ jobs:
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
-          version: '3.12.0'
-      - name: Force-install Helm v3.12.0 (ensure CLI with OCI)
-        run: |
-          echo "Installing Helm v3.12.0 via official script to ensure correct binary"
-          curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-          chmod +x get_helm.sh
-          ./get_helm.sh --version v3.12.0
-        shell: bash
-
-      - name: Debug Helm binary
-        run: |
-          echo "Which helm: $(which helm || true)"
-          helm version --short || true
-          echo "-- helm help summary --"
-          helm --help | head -n 80 || true
-          echo "-- helm commands containing 'chart' or 'registry' --"
-          helm help | grep -E "chart|registry" || true
-        shell: bash
+          version: '4.0.0'
+      # Use the Helm provided by azure/setup-helm@v3 (pinned to 3.12.0 above)
 
       - name: Ensure chart dependencies
         run: |
@@ -67,36 +51,12 @@ jobs:
       - name: Save & push chart to GHCR (OCI)
         run: |
           VERSION=${{ steps.chart_version.outputs.version }}
-          CHART_NAME=$(ls charts | grep ckan | head -n1 | sed 's/\.tgz$//')
+          CHART_TGZ=$(ls charts | grep ckan | head -n1)
+          echo "Pushing packaged chart: charts/$CHART_TGZ"
           export HELM_EXPERIMENTAL_OCI=1
-          # If current helm doesn't support 'chart', install Helm and prefer /usr/local/bin
-          if ! helm help chart >/dev/null 2>&1; then
-            echo "Current helm lacks 'chart' — installing Helm v3.12.0 and prepending /usr/local/bin to PATH"
-            curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-            chmod +x get_helm.sh
-            ./get_helm.sh --version v3.12.0
-            export PATH=/usr/local/bin:$PATH
-            if [ -x /usr/local/bin/helm ]; then
-              HELM_BIN=/usr/local/bin/helm
-            fi
-          fi
-          # Use explicit helm binary
-          HELM_BIN=${HELM_BIN:-$(which helm || echo /usr/local/bin/helm)}
-          echo "Using helm: $HELM_BIN"
-          $HELM_BIN version --short || true
-          $HELM_BIN help | head -n 40 || true
-          if $HELM_BIN help chart >/dev/null 2>&1; then
-            echo "Using 'helm chart' commands"
-            $HELM_BIN chart save ckan oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
-            $HELM_BIN chart push oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
-          else
-            echo "'helm chart' not available; falling back to 'helm push' of packaged chart"
-            CHART_TGZ=$(ls charts | grep ckan | head -n1)
-            echo "Pushing packaged chart: charts/$CHART_TGZ"
-            $HELM_BIN push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan || (
-              echo "helm push failed; printing help for push" && $HELM_BIN push --help || true
-            )
-          fi
+          echo "Logging into GHCR"
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
+          helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
 
       - name: Output published reference
         run: |
