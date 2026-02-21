@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nifi.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "nifi.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "nifi.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "nifi.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: nifi
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.nifi.web.httpsPort }}
+              name: https
+          env:
+            - name: NIFI_WEB_HTTPS_PORT
+              value: {{ .Values.nifi.web.httpsPort | quote }}
+            - name: NIFI_WEB_HTTPS_HOST
+              value: "0.0.0.0"
+            - name: NIFI_WEB_PROXY_HOST
+              value: {{ default .Values.domain .Values.nifi.web.proxyHost | quote }}
+            - name: NIFI_WEB_PROXY_PORT
+              value: {{ .Values.nifi.web.proxyPort | quote }}
+            - name: NIFI_WEB_PROXY_CONTEXT_PATH
+              value: {{ .Values.nifi.web.proxyContextPath | quote }}
+          volumeMounts:
+            - name: nifi-flowfile
+              mountPath: /opt/nifi/nifi-current/flowfile_repository
+            - name: nifi-content
+              mountPath: /opt/nifi/nifi-current/content_repository
+            - name: nifi-provenance
+              mountPath: /opt/nifi/nifi-current/provenance_repository
+            - name: nifi-database
+              mountPath: /opt/nifi/nifi-current/database_repository
+      volumes:
+        - name: nifi-flowfile
+          emptyDir: {}
+        - name: nifi-content
+          emptyDir: {}
+        - name: nifi-provenance
+          emptyDir: {}
+        - name: nifi-database
+          emptyDir: {}

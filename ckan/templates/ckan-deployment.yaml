@@ -1,3 +1,7 @@
+{{- $ckanIngressHost := default .Values.domain .Values.ingress.host -}}
+{{- $ckanSiteUrl := default (printf "https://%s" $ckanIngressHost) .Values.ckan.siteUrl -}}
+{{- $ckanRootPath := default .Values.ingress.paths.ckan .Values.ckan.rootPath -}}
+{{- $ckanCookiePath := default $ckanRootPath .Values.ckan.cookiePath -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,6 +48,16 @@ spec:
               else
                 echo "ckan.root_path = $${CKAN_ROOT_PATH}" >> /config/ckan.ini
               fi
+              if grep -q '^beaker.session.cookie_path' /config/ckan.ini; then
+                sed -i "s|^beaker.session.cookie_path.*|beaker.session.cookie_path = $${CKAN_COOKIE_PATH}|" /config/ckan.ini
+              else
+                echo "beaker.session.cookie_path = $${CKAN_COOKIE_PATH}" >> /config/ckan.ini
+              fi
+              if grep -q '^beaker.session.secure' /config/ckan.ini; then
+                sed -i "s|^beaker.session.secure.*|beaker.session.secure = $${CKAN_COOKIE_SECURE}|" /config/ckan.ini
+              else
+                echo "beaker.session.secure = $${CKAN_COOKIE_SECURE}" >> /config/ckan.ini
+              fi
           env:
             - name: SECRET_KEY
               valueFrom:
@@ -56,9 +70,13 @@ spec:
                   name: {{ include "ckan.fullname" . }}-secrets
                   key: beaker_session_secret
             - name: CKAN_SITE_URL
-              value: {{ .Values.ckan.siteUrl | quote }}
+              value: {{ $ckanSiteUrl | quote }}
             - name: CKAN_ROOT_PATH
-              value: {{ .Values.ckan.rootPath | quote }}
+              value: {{ $ckanRootPath | quote }}
+            - name: CKAN_COOKIE_PATH
+              value: {{ $ckanCookiePath | quote }}
+            - name: CKAN_COOKIE_SECURE
+              value: {{ .Values.ckan.cookieSecure | quote }}
           volumeMounts:
             - name: ckan-config
               mountPath: /config
@@ -110,11 +128,11 @@ spec:
                   name: {{ include "ckan.fullname" . }}-secrets
                   key: beaker_session_secret
             - name: CKAN_SITE_URL
-              value: {{ .Values.ckan.siteUrl | quote }}
+              value: {{ $ckanSiteUrl | quote }}
             - name: CKAN__SITE_URL
-              value: {{ .Values.ckan.siteUrl | quote }}
+              value: {{ $ckanSiteUrl | quote }}
             - name: CKAN__ROOT_PATH
-              value: {{ .Values.ckan.rootPath | quote }}
+              value: {{ $ckanRootPath | quote }}
             - name: CKAN_SQLALCHEMY_URL
               value: {{ printf "postgresql://%s:%s@%s-postgres:5432/%s" .Values.postgres.user .Values.postgres.password (include "ckan.fullname" .) .Values.postgres.db | quote }}
             - name: CKAN_DATASTORE_WRITE_URL

@@ -18,6 +18,9 @@ spec:
         - name: solr-init
           image: {{ .Values.solr.image.repository }}:{{ .Values.solr.image.tag }}
           imagePullPolicy: {{ .Values.solr.image.pullPolicy }}
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
           command:
             - /bin/sh
             - -c
@@ -34,6 +37,7 @@ spec:
             - containerPort: 8983
               name: solr
           args:
+            - solr-precreate
             - ckan
             - /opt/solr/server/solr/configsets/ckan
           volumeMounts:

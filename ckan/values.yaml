@@ -3,6 +3,8 @@ image:
   tag: "2.10"
   pullPolicy: IfNotPresent
 
+domain: stids.concept4gl.xyz
+
 postgres:
   image:
     repository: postgres
@@ -28,9 +30,11 @@ solr:
     pullPolicy: IfNotPresent
 
 ckan:
-  siteUrl: "http://stids.concept4gl.xyz/ckan"
+  siteUrl: ""
   rootPath: "/ckan"
   storagePath: "/var/lib/ckan"
+  cookiePath: ""
+  cookieSecure: true
 
 secrets:
   create: true
@@ -40,10 +44,10 @@ secrets:
 ingress:
   enabled: true
   className: traefik
-  host: stids.concept4gl.xyz
+  host: ""
   tls:
     enabled: true
-    secretName: stids.concept4gl.xyz-tls
+    secretName: tls-secret
   paths:
     ckan: /ckan
     base: /base

@@ -1,0 +1,29 @@
+image:
+  repository: apache/nifi
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+domain: stids.concept4gl.xyz
+
+service:
+  port: 8443
+
+ingress:
+  enabled: true
+  className: traefik
+  host: ""
+  tls:
+    enabled: true
+    secretName: tls-secret
+  path: /nifi
+  entrypoints: web,websecure
+  certResolver: le
+
+nifi:
+  web:
+    httpsPort: 8443
+    proxyHost: ""
+    proxyPort: 443
+    proxyContextPath: /nifi
+
+resources: {}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nifi
+description: Simple NiFi deployment with Traefik ingress
+type: application
+version: 0.1.0
+appVersion: "1.27.0"

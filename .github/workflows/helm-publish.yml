@@ -1,63 +1,86 @@
-name: Build and publish Helm chart (OCI)
+name: Build and publish Helm charts (OCI & Artifact Hub)
 
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'ckan/**'
-      - '.github/workflows/helm-publish.yml'
   workflow_dispatch:
+
+env:
+  HELM_EXPERIMENTAL_OCI: 1
 
 jobs:
   publish:
-    name: Package and publish chart to GHCR
+    name: Package and publish all charts to GHCR & GitHub Releases
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
-    env:
-      HELM_EXPERIMENTAL_OCI: 1
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Helm
         uses: azure/setup-helm@v3
         with:
           version: '4.0.0'
-      # Use the Helm provided by azure/setup-helm@v3 (pinned to 3.12.0 above)
-
-      - name: Ensure chart dependencies
-        run: |
-          if [ -d ckan ]; then
-            helm dependency update ckan || true
-          fi
 
       - name: Login to GHCR
         run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Package chart
+      - name: Build and publish all charts
         run: |
           mkdir -p charts
-          helm package ckan --destination charts
+          
+          # Find all directories containing Chart.yaml
+          for chart_dir in $(find . -maxdepth 2 -name 'Chart.yaml' -type f | xargs -I {} dirname {} | sed 's|^\./||' | sort); do
+            echo "Processing chart: $chart_dir"
+            
+            # Update chart dependencies
+            helm dependency update "$chart_dir" || true
+            
+            # Package chart
+            helm package "$chart_dir" --destination charts
+            
+            # Extract chart name and version
+            CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}')
+            VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}')
+            
+            # Find packaged chart file
+            CHART_TGZ=$(ls charts | grep -E "^${CHART_NAME}-" | tail -n1)
+            
+            echo "Publishing $CHART_NAME version $VERSION"
+            echo "Chart file: charts/$CHART_TGZ"
+            
+            # Push to GHCR (OCI)
+            helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME
+            echo "Published to GHCR: oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME:$VERSION"
+          done
 
-      - name: Extract chart version
-        id: chart_version
+      - name: Generate chart list
+        id: chart_list
         run: |
-          VERSION=$(grep '^version:' ckan/Chart.yaml | head -1 | awk '{print $2}')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          for chart_tgz in charts/*.tgz; do
+            CHART_NAME=$(basename "$chart_tgz" | sed 's/-[^-]*\.tgz$//')
+            echo "- \`$CHART_NAME\`" >> $GITHUB_OUTPUT
+          done
+          echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Save & push chart to GHCR (OCI)
-        run: |
-          VERSION=${{ steps.chart_version.outputs.version }}
-          CHART_TGZ=$(ls charts | grep ckan | head -n1)
-          echo "Pushing packaged chart: charts/$CHART_TGZ"
-          export HELM_EXPERIMENTAL_OCI=1
-          echo "Logging into GHCR"
-          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
-          helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/ckan
-
-      - name: Output published reference
-        run: |
-          echo "Published: oci://ghcr.io/${{ github.repository_owner }}/ckan:${{ steps.chart_version.outputs.version }}"
+      - name: Create/Update GitHub Releases for Artifact Hub
+        uses: softprops/action-gh-release@v1
+        with:
+          files: charts/*.tgz
+          draft: false
+          prerelease: false
+          tag_name: helm-charts-${{ github.run_number }}
+          body: |
+            Helm charts packaged and ready for deployment.
+            
+            **Available Charts:**
+            ${{ steps.chart_list.outputs.content }}
+            
+            Charts can be used with Artifact Hub or installed directly with Helm.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
