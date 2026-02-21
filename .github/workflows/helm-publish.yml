@@ -45,12 +45,12 @@ jobs:
             # Package chart and capture output
             PACKAGE_OUTPUT=$(helm package "$chart_dir" --destination charts 2>&1)
             
-            # Extract chart name and version (trim whitespace)
-            CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
-            VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
+            # Extract chart name and version, removing all whitespace
+            CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             
             # Extract packaged file from helm output
-            CHART_TGZ=$(echo "$PACKAGE_OUTPUT" | grep -oP 'saved it to: \K.*' | xargs)
+            CHART_TGZ=$(echo "$PACKAGE_OUTPUT" | grep -oP 'saved it to: \K.*' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
             
             if [ -z "$CHART_TGZ" ] || [ ! -f "$CHART_TGZ" ]; then
               echo "Error: Could not find packaged chart for $CHART_NAME"
@@ -62,8 +62,8 @@ jobs:
             echo "Chart file: $CHART_TGZ"
             
             # Push to GHCR (OCI)
-            helm push "$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME
-            echo "Published to GHCR: oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME:$VERSION"
+            helm push "$CHART_TGZ" "oci://ghcr.io/${{ github.repository_owner }}/${CHART_NAME}"
+            echo "Published to GHCR: oci://ghcr.io/${{ github.repository_owner }}/${CHART_NAME}:${VERSION}"
           done
 
       - name: Generate chart list
