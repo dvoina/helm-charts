@@ -69,8 +69,25 @@ jobs:
           VERSION=${{ steps.chart_version.outputs.version }}
           CHART_NAME=$(ls charts | grep ckan | head -n1 | sed 's/\.tgz$//')
           export HELM_EXPERIMENTAL_OCI=1
-          helm chart save ckan oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
-          helm chart push oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+          # Resolve a helm binary that supports the 'chart' subcommand
+          HELM_BIN=$(which helm || true)
+          if [ -n "$HELM_BIN" ]; then
+            if ! $HELM_BIN help chart >/dev/null 2>&1; then
+              if [ -x /usr/local/bin/helm ]; then
+                HELM_BIN=/usr/local/bin/helm
+              elif [ -x /home/runner/.local/bin/helm ]; then
+                HELM_BIN=/home/runner/.local/bin/helm
+              fi
+            fi
+          else
+            # fallback
+            HELM_BIN=/usr/local/bin/helm
+          fi
+          echo "Using helm: $HELM_BIN"
+          $HELM_BIN version --short || true
+          $HELM_BIN help | head -n 40 || true
+          $HELM_BIN chart save ckan oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
+          $HELM_BIN chart push oci://ghcr.io/${{ github.repository_owner }}/ckan:${VERSION}
 
       - name: Output published reference
         run: |
