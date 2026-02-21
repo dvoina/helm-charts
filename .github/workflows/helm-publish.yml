@@ -33,8 +33,10 @@ jobs:
         run: |
           mkdir -p charts
           
-          # Find all directories containing Chart.yaml
-          for chart_dir in $(find . -maxdepth 2 -name 'Chart.yaml' -type f | xargs -I {} dirname {} | sed 's|^\./||' | sort); do
+          # Find all directories containing Chart.yaml (charts are at top level)
+          for chart_dir in $(find . -maxdepth 1 -name 'Chart.yaml' -type f | xargs -I {} dirname {} | sed 's|^\./||' | sort); do
+            [ "$chart_dir" = "." ] && continue
+            
             echo "Processing chart: $chart_dir"
             
             # Update chart dependencies
@@ -43,18 +45,23 @@ jobs:
             # Package chart
             helm package "$chart_dir" --destination charts
             
-            # Extract chart name and version
-            CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}')
-            VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}')
+            # Extract chart name and version (trim whitespace)
+            CHART_NAME=$(grep '^name:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
+            VERSION=$(grep '^version:' "$chart_dir/Chart.yaml" | head -1 | awk '{print $2}' | xargs)
             
             # Find packaged chart file
-            CHART_TGZ=$(ls charts | grep -E "^${CHART_NAME}-" | tail -n1)
+            CHART_TGZ=$(ls -1 charts/${CHART_NAME}-${VERSION}.tgz 2>/dev/null || echo "")
+            
+            if [ -z "$CHART_TGZ" ]; then
+              echo "Error: Could not find packaged chart for $CHART_NAME"
+              exit 1
+            fi
             
             echo "Publishing $CHART_NAME version $VERSION"
-            echo "Chart file: charts/$CHART_TGZ"
+            echo "Chart file: $CHART_TGZ"
             
             # Push to GHCR (OCI)
-            helm push "charts/$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME
+            helm push "$CHART_TGZ" oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME
             echo "Published to GHCR: oci://ghcr.io/${{ github.repository_owner }}/$CHART_NAME:$VERSION"
           done
 
@@ -62,10 +69,12 @@ jobs:
         id: chart_list
         run: |
           echo "content<<EOF" >> $GITHUB_OUTPUT
-          for chart_tgz in charts/*.tgz; do
-            CHART_NAME=$(basename "$chart_tgz" | sed 's/-[^-]*\.tgz$//')
-            echo "- \`$CHART_NAME\`" >> $GITHUB_OUTPUT
-          done
+          if [ -f charts/*.tgz ]; then
+            for chart_tgz in charts/*.tgz; do
+              CHART_NAME=$(basename "$chart_tgz" | sed 's/-[^-]*\.tgz$//')
+              echo "- \`$CHART_NAME\`" >> $GITHUB_OUTPUT
+            done
+          fi
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create/Update GitHub Releases for Artifact Hub
